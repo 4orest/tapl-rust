@@ -20,7 +20,6 @@ enum Term {
 enum EvalProgress {
     Still(Box<Term>),
     NoRuleApplies,
-    Failure(&str),
 }
 
 fn parser_true(c: &str) -> IResult<&str, Term> {
@@ -116,22 +115,22 @@ fn isnumericval(t: &Term) -> bool {
     }
 }
 
-fn eval1(t: &Term) -> EvalProgress {
+fn eval1(t: &Term) -> Result<EvalProgress, String> {
     match t {
         Term::TmIf(t1, t2, t3) => {
             match **t1 {
-                Term::TmTrue => EvalProgress::Still(t2.clone()),
-                Term::TmFalse => EvalProgress::Still(t3.clone()),
+                Term::TmTrue => Ok(EvalProgress::Still(t2.clone())),
+                Term::TmFalse => Ok(EvalProgress::Still(t3.clone())),
                 // エラー起きそう
                 _ => {
                     let evaluated = eval(t1);
                     match evaluated {
-                        Ok(t) => EvalProgress::Still(Box::new(Term::TmIf(
+                        Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIf(
                             Box::new(t),
                             t2.clone(),
                             t3.clone(),
-                        ))),
-                        Err(errmsg) => EvalProgress::Failure(errmsg),
+                        )))),
+                        Err(errmsg) => Err(errmsg),
                     }
                 }
             }
@@ -139,54 +138,56 @@ fn eval1(t: &Term) -> EvalProgress {
         Term::TmSucc(t) => {
             let evaluated = eval(t);
             match evaluated {
-                Ok(t) => EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t)))),
-                Err(errmsg) => EvalProgress::Failure(errmsg),
+                Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))),
+                Err(errmsg) => Err(errmsg),
             }
         }
-        Term::TmPred(t) => match **t {
-            Term::TmZero => EvalProgress::Still(Box::new(Term::TmZero)),
+        Term::TmPred(t) => match &**t {
+            Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
             Term::TmSucc(t) => {
                 if isnumericval(&*t) {
-                    EvalProgress::Still(t)
+                    Ok(EvalProgress::Still(t.clone()))
                 } else {
-                    EvalProgress::Failure("数であるべき項が数でない")
+                    Err("数であるべき項が数でない".to_string())
                 }
             }
             _ => {
                 let evaluated = eval(t);
                 match evaluated {
-                    Ok(t) => EvalProgress::Still(Box::new(Term::TmPred(Box::new(t)))),
-                    Err(errmsg) => EvalProgress::Failure(errmsg),
+                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmPred(Box::new(t))))),
+                    Err(errmsg) => Err(errmsg),
                 }
             }
         },
-        Term::TmIsZero(t) => match **t {
-            Term::TmZero => EvalProgress::Still(Box::new(Term::TmTrue)),
+        Term::TmIsZero(t) => match &**t {
+            Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmTrue))),
             Term::TmSucc(t) => {
                 if isnumericval(&*t) {
-                    EvalProgress::Still(Box::new(Term::TmFalse))
+                    Ok(EvalProgress::Still(Box::new(Term::TmFalse)))
                 } else {
-                    EvalProgress::Failure("数であるべき項が数でない")
+                    Err("数であるべき項が数でない".to_string())
                 }
             }
             _ => {
                 let evaluated = eval(t);
                 match evaluated {
-                    Ok(t) => EvalProgress::Still(Box::new(Term::TmIsZero(Box::new(t)))),
-                    Err(errmsg) => EvalProgress::Failure(errmsg),
+                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIsZero(Box::new(t))))),
+                    Err(errmsg) => Err(errmsg),
                 }
             }
         },
-        _ => EvalProgress::NoRuleApplies,
+        _ => Ok(EvalProgress::NoRuleApplies),
     }
 }
 
-fn eval(t: &Term) -> Result<Term, &str> {
+fn eval(t: &Term) -> Result<Term, String> {
     let t1 = eval1(t);
     match t1 {
-        EvalProgress::Still(tt) => eval(&tt),
-        EvalProgress::NoRuleApplies => Ok(t.clone()),
-        EvalProgress::Failure(s) => Err(s),
+        Ok(ep) => match ep {
+            EvalProgress::Still(tt) => eval(&*tt),
+            EvalProgress::NoRuleApplies => Ok(t.clone()),
+        },
+        Err(s) => Err(s),
     }
 }
 
