@@ -6,7 +6,7 @@ use nom::{
 };
 use rustyline::Editor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Term {
     TmTrue,
     TmFalse,
@@ -20,6 +20,7 @@ enum Term {
 enum EvalProgress {
     Still(Box<Term>),
     NoRuleApplies,
+    Failure(&str),
 }
 
 fn parser_true(c: &str) -> IResult<&str, Term> {
@@ -107,13 +108,85 @@ fn parse(c: &str) -> Option<Term> {
     }
 }
 
-fn eval1(t: &Term) -> EvalProgress {}
+fn isnumericval(t: &Term) -> bool {
+    match t {
+        Term::TmZero => true,
+        Term::TmSucc(t1) => isnumericval(t1),
+        _ => false,
+    }
+}
 
-fn eval(t: &Term) -> Term {
+fn eval1(t: &Term) -> EvalProgress {
+    match t {
+        Term::TmIf(t1, t2, t3) => {
+            match **t1 {
+                Term::TmTrue => EvalProgress::Still(t2.clone()),
+                Term::TmFalse => EvalProgress::Still(t3.clone()),
+                // エラー起きそう
+                _ => {
+                    let evaluated = eval(t1);
+                    match evaluated {
+                        Ok(t) => EvalProgress::Still(Box::new(Term::TmIf(
+                            Box::new(t),
+                            t2.clone(),
+                            t3.clone(),
+                        ))),
+                        Err(errmsg) => EvalProgress::Failure(errmsg),
+                    }
+                }
+            }
+        }
+        Term::TmSucc(t) => {
+            let evaluated = eval(t);
+            match evaluated {
+                Ok(t) => EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t)))),
+                Err(errmsg) => EvalProgress::Failure(errmsg),
+            }
+        }
+        Term::TmPred(t) => match **t {
+            Term::TmZero => EvalProgress::Still(Box::new(Term::TmZero)),
+            Term::TmSucc(t) => {
+                if isnumericval(&*t) {
+                    EvalProgress::Still(t)
+                } else {
+                    EvalProgress::Failure("数であるべき項が数でない")
+                }
+            }
+            _ => {
+                let evaluated = eval(t);
+                match evaluated {
+                    Ok(t) => EvalProgress::Still(Box::new(Term::TmPred(Box::new(t)))),
+                    Err(errmsg) => EvalProgress::Failure(errmsg),
+                }
+            }
+        },
+        Term::TmIsZero(t) => match **t {
+            Term::TmZero => EvalProgress::Still(Box::new(Term::TmTrue)),
+            Term::TmSucc(t) => {
+                if isnumericval(&*t) {
+                    EvalProgress::Still(Box::new(Term::TmFalse))
+                } else {
+                    EvalProgress::Failure("数であるべき項が数でない")
+                }
+            }
+            _ => {
+                let evaluated = eval(t);
+                match evaluated {
+                    Ok(t) => EvalProgress::Still(Box::new(Term::TmIsZero(Box::new(t)))),
+                    Err(errmsg) => EvalProgress::Failure(errmsg),
+                }
+            }
+        },
+        _ => EvalProgress::NoRuleApplies,
+    }
+}
+
+fn eval(t: &Term) -> Result<Term, &str> {
     let t1 = eval1(t);
     match t1 {
         EvalProgress::Still(tt) => eval(&tt),
-        EvalProgress::NoRuleApplies => t,
+        EvalProgress::NoRuleApplies => Ok(t.clone()),
+        EvalProgress::Failure(s) => Err(s),
     }
 }
 
@@ -122,7 +195,9 @@ fn main() {
     loop {
         if let Ok(readline) = rl.readline(">> ") {
             if let Some(e) = parse(&readline) {
-                println!(eval(&e));
+                if let Ok(t) = eval(&e) {
+                    dbg!(&t);
+                }
             }
         } else {
             break;
