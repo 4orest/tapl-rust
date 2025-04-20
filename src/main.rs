@@ -117,24 +117,21 @@ fn isnumericval(t: &Term) -> bool {
 
 fn eval1(t: &Term) -> Result<EvalProgress, String> {
     match t {
-        Term::TmIf(t1, t2, t3) => {
-            match **t1 {
-                Term::TmTrue => Ok(EvalProgress::Still(t2.clone())),
-                Term::TmFalse => Ok(EvalProgress::Still(t3.clone())),
-                // エラー起きそう
-                _ => {
-                    let evaluated = eval(t1);
-                    match evaluated {
-                        Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIf(
-                            Box::new(t),
-                            t2.clone(),
-                            t3.clone(),
-                        )))),
-                        Err(errmsg) => Err(errmsg),
-                    }
+        Term::TmIf(t1, t2, t3) => match **t1 {
+            Term::TmTrue => Ok(EvalProgress::Still(t2.clone())),
+            Term::TmFalse => Ok(EvalProgress::Still(t3.clone())),
+            _ => {
+                let evaluated = eval(t1);
+                match evaluated {
+                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIf(
+                        Box::new(t),
+                        t2.clone(),
+                        t3.clone(),
+                    )))),
+                    Err(errmsg) => Err(errmsg),
                 }
             }
-        }
+        },
         Term::TmSucc(t) => {
             let evaluated = eval(t);
             match evaluated {
