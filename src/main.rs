@@ -6,7 +6,7 @@ use nom::{
 };
 use rustyline::Editor;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum Term {
     TmTrue,
     TmFalse,
@@ -200,5 +200,22 @@ fn main() {
         } else {
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_true() {
+        let result = parser_true("true");
+        assert_eq!(Ok(("", Term::TmTrue)), result);
+    }
+
+    #[test]
+    fn test_parse_false() {
+        let result = parser_false("false");
+        assert_eq!(Ok(("", Term::TmFalse)), result);
     }
 }
