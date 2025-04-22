@@ -214,8 +214,32 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_true_ng() {
+        let result = parser_true("false");
+        assert_eq!(
+            Err(nom::Err::Error(nom::error::Error::new(
+                "false",
+                nom::error::ErrorKind::Tag
+            ))),
+            result
+        );
+    }
+
+    #[test]
     fn test_parse_false() {
         let result = parser_false("false");
         assert_eq!(Ok(("", Term::TmFalse)), result);
+    }
+
+    #[test]
+    fn test_parse_false_ng() {
+        let result = parser_false("true");
+        assert_eq!(
+            Err(nom::Err::Error(nom::error::Error::new(
+                "true",
+                nom::error::ErrorKind::Tag
+            ))),
+            result
+        );
     }
 }
