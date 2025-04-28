@@ -2,7 +2,8 @@ use nom::{
     IResult,
     branch::alt,
     bytes::complete::tag,
-    character::complete::{char, multispace0},
+    character::complete::{digit1, multispace0},
+    error::ErrorKind,
 };
 use rustyline::Editor;
 
@@ -50,10 +51,23 @@ fn parser_if(c: &str) -> IResult<&str, Term> {
     Ok((c, Term::TmIf(Box::new(t1), Box::new(t2), Box::new(t3))))
 }
 
-fn parser_zero(c: &str) -> IResult<&str, Term> {
-    let (c, _) = char('0')(c)?;
+fn parser_nat(c: &str) -> IResult<&str, Term> {
+    let (c1, v) = digit1(c)?;
 
-    Ok((c, Term::TmZero))
+    if let Ok(n) = v.parse::<u64>() {
+        Ok((c1, nat_to_succ_stack(n)))
+    } else {
+        let err = nom::error::Error::new(c, ErrorKind::Fail);
+        Err(nom::Err::Failure(err))
+    }
+}
+
+fn nat_to_succ_stack(n: u64) -> Term {
+    if n == 0 {
+        Term::TmZero
+    } else {
+        Term::TmSucc(Box::new(nat_to_succ_stack(n - 1)))
+    }
 }
 
 fn parser_succ(c: &str) -> IResult<&str, Term> {
@@ -87,7 +101,7 @@ fn parse_term(c: &str) -> IResult<&str, Term> {
         parser_true,
         parser_false,
         parser_if,
-        parser_zero,
+        parser_nat,
         parser_succ,
         parser_pred,
         parser_iszero,
@@ -241,5 +255,55 @@ mod tests {
             ))),
             result
         );
+    }
+
+    #[test]
+    fn nat_to_succ_zero() {
+        let result = nat_to_succ_stack(0);
+        assert_eq!(Term::TmZero, result);
+    }
+
+    #[test]
+    fn nat_to_succ_nonzero() {
+        let result = nat_to_succ_stack(4);
+
+        let expected = Term::TmSucc(Box::new(Term::TmSucc(Box::new(Term::TmSucc(Box::new(
+            Term::TmSucc(Box::new(Term::TmZero)),
+        ))))));
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn parse_zero() {
+        let result = parser_nat("0");
+
+        assert_eq!(Ok(("", Term::TmZero)), result);
+    }
+
+    #[test]
+    fn parse_3() {
+        let result = parser_nat("3");
+
+        let expected = Ok((
+            "",
+            Term::TmSucc(Box::new(Term::TmSucc(Box::new(Term::TmSucc(Box::new(
+                Term::TmZero,
+            )))))),
+        ));
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn parse_negative_int() {
+        let result = parser_nat("-1");
+
+        let expected = Err(nom::Err::Error(nom::error::Error::new(
+            "-1",
+            nom::error::ErrorKind::Digit,
+        )));
+
+        assert_eq!(expected, result);
     }
 }
