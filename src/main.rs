@@ -121,10 +121,18 @@ fn parse(c: &str) -> Option<Term> {
     }
 }
 
-fn isnumericval(t: &Term) -> bool {
+fn is_numericval(t: &Term) -> bool {
     match t {
         Term::TmZero => true,
-        Term::TmSucc(t1) => isnumericval(t1),
+        Term::TmSucc(t1) => is_numericval(t1),
+        _ => false,
+    }
+}
+
+fn is_booleanval(t: &Term) -> bool {
+    match t {
+        Term::TmTrue => true,
+        Term::TmFalse => true,
         _ => false,
     }
 }
@@ -156,7 +164,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
         Term::TmPred(t) => match &**t {
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
             Term::TmSucc(t) => {
-                if isnumericval(&*t) {
+                if is_numericval(&*t) {
                     Ok(EvalProgress::Still(t.clone()))
                 } else {
                     Err("数であるべき項が数でない".to_string())
@@ -173,7 +181,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
         Term::TmIsZero(t) => match &**t {
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmTrue))),
             Term::TmSucc(t) => {
-                if isnumericval(&*t) {
+                if is_numericval(&*t) {
                     Ok(EvalProgress::Still(Box::new(Term::TmFalse)))
                 } else {
                     Err("数であるべき項が数でない".to_string())
