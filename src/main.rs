@@ -155,10 +155,16 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
             }
         },
         Term::TmSucc(t) => {
-            let evaluated = eval(t);
-            match evaluated {
-                Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))),
-                Err(errmsg) => Err(errmsg),
+            if is_booleanval(t) {
+                Err("数であるべき項が数でない".to_string())
+            } else if is_numericval(t) {
+                Ok(EvalProgress::NoRuleApplies)
+            } else {
+                let evaluated = eval(t);
+                match evaluated {
+                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))),
+                    Err(errmsg) => Err(errmsg),
+                }
             }
         }
         Term::TmPred(t) => match &**t {
