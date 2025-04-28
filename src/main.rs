@@ -221,8 +221,14 @@ fn main() {
     loop {
         if let Ok(readline) = rl.readline(">> ") {
             if let Some(e) = parse(&readline) {
-                if let Ok(t) = eval(&e) {
-                    dbg!(&t);
+                let result = eval(&e);
+                match result {
+                    Ok(t) => {
+                        dbg!(t);
+                    }
+                    Err(errmsg) => {
+                        println!("{}", errmsg);
+                    }
                 }
             }
         } else {
@@ -319,5 +325,28 @@ mod tests {
         )));
 
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn eval_zero() {
+        let result = eval(&Term::TmZero);
+
+        assert_eq!(Ok(Term::TmZero), result);
+    }
+
+    #[test]
+    fn eval_one() {
+        let result = eval(&Term::TmSucc(Box::new(Term::TmZero)));
+
+        assert_eq!(Ok(Term::TmSucc(Box::new(Term::TmZero))), result);
+    }
+
+    #[test]
+    fn eval_pred_succ() {
+        let result = eval(&Term::TmPred(Box::new(Term::TmSucc(Box::new(
+            Term::TmZero,
+        )))));
+
+        assert_eq!(Ok(Term::TmZero), result);
     }
 }
