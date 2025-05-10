@@ -1,3 +1,5 @@
+use std::fmt;
+
 use nom::{
     IResult,
     branch::alt,
@@ -17,6 +19,27 @@ enum Term {
     TmPred(Box<Term>),
     TmIsZero(Box<Term>),
 }
+
+// impl fmt::Display for Term {
+//     /// 項を表示用にきれいにformat
+//     /// valueのみ、それ以外はとりあえずDebugと同じ
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         if is_numericval(self) {
+//             let s = succ_stack_to_nat(self).unwrap().to_string();
+//             write!(f, "{}", s)?;
+//             return Ok(());
+//         }
+
+//         let s = match self {
+//             Term::TmFalse => "false".to_string(),
+//             Term::TmTrue => "true".to_string(),
+//             _ => format!("{:?}", self),
+//         };
+
+//         write!(f, "{}", s)?;
+//         Ok(())
+//     }
+// }
 
 enum EvalProgress {
     Still(Box<Term>),
@@ -67,6 +90,18 @@ fn nat_to_succ_stack(n: u64) -> Term {
         Term::TmZero
     } else {
         Term::TmSucc(Box::new(nat_to_succ_stack(n - 1)))
+    }
+}
+
+fn succ_stack_to_nat(t: &Term) -> Result<u64, String> {
+    if !is_numericval(t) {
+        return Err("数であるべき項が数でない".to_string());
+    }
+
+    match t {
+        Term::TmZero => Ok(0),
+        Term::TmSucc(t) => succ_stack_to_nat(t).and_then(|x| Ok(x + 1)),
+        _ => Err("数であるべき項が数でない".to_string()),
     }
 }
 
@@ -348,5 +383,31 @@ mod tests {
         )))));
 
         assert_eq!(Ok(Term::TmZero), result);
+    }
+
+    #[test]
+    fn test_succ_to_nat_zero() {
+        let result = succ_stack_to_nat(&Term::TmZero);
+
+        assert_eq!(result, Ok(0));
+    }
+
+    #[test]
+    fn test_succ_to_nat_three() {
+        let term = &Term::TmSucc(Box::new(Term::TmSucc(Box::new(Term::TmSucc(Box::new(
+            Term::TmZero,
+        ))))));
+
+        let result = succ_stack_to_nat(term);
+
+        assert_eq!(result, Ok(3));
+    }
+
+    #[test]
+    fn test_succ_to_nat_err() {
+        let term = &Term::TmTrue;
+        let result = succ_stack_to_nat(term);
+
+        assert_eq!(result, Err("数であるべき項が数でない".to_string()));
     }
 }
