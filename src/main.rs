@@ -20,26 +20,26 @@ enum Term {
     TmIsZero(Box<Term>),
 }
 
-// impl fmt::Display for Term {
-//     /// 項を表示用にきれいにformat
-//     /// valueのみ、それ以外はとりあえずDebugと同じ
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         if is_numericval(self) {
-//             let s = succ_stack_to_nat(self).unwrap().to_string();
-//             write!(f, "{}", s)?;
-//             return Ok(());
-//         }
+impl fmt::Display for Term {
+    /// 項を表示用にきれいにformat
+    /// valueのみ、それ以外はとりあえずDebugと同じ
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if is_numericval(self) {
+            let s = succ_stack_to_nat(self).unwrap().to_string();
+            write!(f, "{}", s)?;
+            return Ok(());
+        }
 
-//         let s = match self {
-//             Term::TmFalse => "false".to_string(),
-//             Term::TmTrue => "true".to_string(),
-//             _ => format!("{:?}", self),
-//         };
+        let s = match self {
+            Term::TmFalse => "false".to_string(),
+            Term::TmTrue => "true".to_string(),
+            _ => format!("{:?}", self),
+        };
 
-//         write!(f, "{}", s)?;
-//         Ok(())
-//     }
-// }
+        write!(f, "{}", s)?;
+        Ok(())
+    }
+}
 
 enum EvalProgress {
     Still(Box<Term>),
@@ -203,6 +203,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
             }
         }
         Term::TmPred(t) => match &**t {
+            // true, falseのエラー処理追加
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
             Term::TmSucc(t) => {
                 if is_numericval(&*t) {
@@ -220,6 +221,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
             }
         },
         Term::TmIsZero(t) => match &**t {
+            // true, falseのエラー処理追加
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmTrue))),
             Term::TmSucc(t) => {
                 if is_numericval(&*t) {
@@ -259,7 +261,7 @@ fn main() {
                 let result = eval(&e);
                 match result {
                     Ok(t) => {
-                        dbg!(t);
+                        println!("{}", t);
                     }
                     Err(errmsg) => {
                         println!("{}", errmsg);
