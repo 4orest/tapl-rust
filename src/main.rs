@@ -225,11 +225,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
                 }
             }
             _ => {
-                let evaluated = eval(t);
-                match evaluated {
-                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIsZero(Box::new(t))))),
-                    Err(errmsg) => Err(errmsg),
-                }
+                eval(t).and_then(|t| Ok(EvalProgress::Still(Box::new(Term::TmIsZero(Box::new(t))))))
             }
         },
         _ => Ok(EvalProgress::NoRuleApplies),
@@ -416,5 +412,21 @@ mod tests {
         let result = eval(&term);
 
         assert_eq!(result, Ok(Term::TmSucc(Box::new(Term::TmZero))));
+    }
+
+    #[test]
+    fn eval_iszero_true() {
+        let term = Term::TmIsZero(Box::new(Term::TmZero));
+        let result = eval(&term);
+
+        assert_eq!(result, Ok(Term::TmTrue));
+    }
+
+    #[test]
+    fn eval_iszero_false() {
+        let term = Term::TmIsZero(Box::new(Term::TmSucc(Box::new(Term::TmZero))));
+        let result = eval(&term);
+
+        assert_eq!(result, Ok(Term::TmFalse));
     }
 }
