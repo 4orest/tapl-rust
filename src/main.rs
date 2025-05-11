@@ -177,17 +177,13 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
         Term::TmIf(t1, t2, t3) => match **t1 {
             Term::TmTrue => Ok(EvalProgress::Still(t2.clone())),
             Term::TmFalse => Ok(EvalProgress::Still(t3.clone())),
-            _ => {
-                let evaluated = eval(t1);
-                match evaluated {
-                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmIf(
-                        Box::new(t),
-                        t2.clone(),
-                        t3.clone(),
-                    )))),
-                    Err(errmsg) => Err(errmsg),
-                }
-            }
+            _ => eval(t).and_then(|t| {
+                Ok(EvalProgress::Still(Box::new(Term::TmIf(
+                    Box::new(t),
+                    t2.clone(),
+                    t3.clone(),
+                ))))
+            }),
         },
         Term::TmSucc(t) => {
             if is_booleanval(t) {
@@ -195,24 +191,14 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
             } else if is_numericval(t) {
                 Ok(EvalProgress::NoRuleApplies)
             } else {
-                let evaluated = eval(t);
-                match evaluated {
-                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))),
-                    Err(errmsg) => Err(errmsg),
-                }
+                eval(t).and_then(|t| Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))))
             }
         }
         Term::TmPred(t) => match &**t {
             // true, falseのエラー処理追加
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
             Term::TmSucc(t) if is_numericval(t) => Ok(EvalProgress::Still(t.clone())),
-            _ => {
-                let evaluated = eval(t);
-                match evaluated {
-                    Ok(t) => Ok(EvalProgress::Still(Box::new(Term::TmPred(Box::new(t))))),
-                    Err(errmsg) => Err(errmsg),
-                }
-            }
+            _ => eval(t).and_then(|t| Ok(EvalProgress::Still(Box::new(Term::TmPred(Box::new(t)))))),
         },
         Term::TmIsZero(t) => match &**t {
             // true, falseのエラー処理追加
@@ -269,13 +255,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_true() {
+    fn parse_true() {
         let result = parser_true("true");
         assert_eq!(Ok(("", Term::TmTrue)), result);
     }
 
     #[test]
-    fn test_parse_true_ng() {
+    fn parse_true_ng() {
         let result = parser_true("false");
         assert_eq!(
             Err(nom::Err::Error(nom::error::Error::new(
@@ -287,13 +273,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_false() {
+    fn parse_false() {
         let result = parser_false("false");
         assert_eq!(Ok(("", Term::TmFalse)), result);
     }
 
     #[test]
-    fn test_parse_false_ng() {
+    fn parse_false_ng() {
         let result = parser_false("true");
         assert_eq!(
             Err(nom::Err::Error(nom::error::Error::new(
@@ -378,14 +364,14 @@ mod tests {
     }
 
     #[test]
-    fn test_succ_to_nat_zero() {
+    fn succ_to_nat_zero() {
         let result = succ_stack_to_nat(&Term::TmZero);
 
         assert_eq!(result, Ok(0));
     }
 
     #[test]
-    fn test_succ_to_nat_three() {
+    fn succ_to_nat_three() {
         let term = &Term::TmSucc(Box::new(Term::TmSucc(Box::new(Term::TmSucc(Box::new(
             Term::TmZero,
         ))))));
@@ -396,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_succ_to_nat_err() {
+    fn succ_to_nat_err() {
         let term = &Term::TmTrue;
         let result = succ_stack_to_nat(term);
 
