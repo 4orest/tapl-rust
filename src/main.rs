@@ -205,13 +205,7 @@ fn eval1(t: &Term) -> Result<EvalProgress, String> {
         Term::TmPred(t) => match &**t {
             // true, falseのエラー処理追加
             Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
-            Term::TmSucc(t) => {
-                if is_numericval(&*t) {
-                    Ok(EvalProgress::Still(t.clone()))
-                } else {
-                    Err("数であるべき項が数でない".to_string())
-                }
-            }
+            Term::TmSucc(t) if is_numericval(t) => Ok(EvalProgress::Still(t.clone())),
             _ => {
                 let evaluated = eval(t);
                 match evaluated {
