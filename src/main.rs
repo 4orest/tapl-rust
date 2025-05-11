@@ -412,4 +412,15 @@ mod tests {
 
         assert_eq!(result, Err("数であるべき項が数でない".to_string()));
     }
+
+    #[test]
+    fn eval_psps() {
+        let term = Term::TmPred(Box::new(Term::TmSucc(Box::new(Term::TmPred(Box::new(
+            Term::TmSucc(Box::new(Term::TmSucc(Box::new(Term::TmZero)))),
+        ))))));
+
+        let result = eval(&term);
+
+        assert_eq!(result, Ok(Term::TmSucc(Box::new(Term::TmZero))));
+    }
 }
