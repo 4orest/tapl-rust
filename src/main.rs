@@ -47,18 +47,9 @@ fn inner_fmt(t: &Term) -> String {
 
             s
         }
-        Term::TmSucc(t) => {
-            let s = "succ ".to_string() + &inner_fmt(t);
-            s
-        }
-        Term::TmPred(t) => {
-            let s = "pred ".to_string() + &inner_fmt(t);
-            s
-        }
-        Term::TmIsZero(t) => {
-            let s = "iszero ".to_string() + &inner_fmt(t);
-            s
-        }
+        Term::TmSucc(t) => "succ ".to_string() + &inner_fmt(t),
+        Term::TmPred(t) => "pred ".to_string() + &inner_fmt(t),
+        Term::TmIsZero(t) => "iszero ".to_string() + &inner_fmt(t),
         _ => "".to_string(),
     };
 
