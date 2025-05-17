@@ -21,8 +21,6 @@ enum Term {
 }
 
 impl fmt::Display for Term {
-    /// 項を表示用にきれいにformat
-    /// valueのみ、それ以外はとりあえずDebugと同じ
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = inner_fmt(self);
         write!(f, "{}", s)
@@ -174,6 +172,7 @@ fn is_numericval(t: &Term) -> bool {
     }
 }
 
+/// 適用できるルールが無い場合はNoneを返す
 fn eval1(t: &Term) -> Option<Term> {
     match t {
         Term::TmIf(t1, t2, t3) => match &**t1 {
