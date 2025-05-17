@@ -24,26 +24,45 @@ impl fmt::Display for Term {
     /// 項を表示用にきれいにformat
     /// valueのみ、それ以外はとりあえずDebugと同じ
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if is_numericval(self) {
-            let s = succ_stack_to_nat(self).unwrap().to_string();
-            write!(f, "{}", s)?;
-            return Ok(());
-        }
-
-        let s = match self {
-            Term::TmFalse => "false".to_string(),
-            Term::TmTrue => "true".to_string(),
-            _ => format!("{:?}", self),
-        };
-
-        write!(f, "{}", s)?;
-        Ok(())
+        let s = inner_fmt(self);
+        write!(f, "{}", s)
     }
 }
 
-enum EvalProgress {
-    Still(Box<Term>),
-    NoRuleApplies,
+fn inner_fmt(t: &Term) -> String {
+    if is_numericval(t) {
+        return succ_stack_to_nat(t).unwrap().to_string();
+    }
+
+    let s = match t {
+        Term::TmTrue => "true".to_string(),
+        Term::TmFalse => "false".to_string(),
+        Term::TmIf(t1, t2, t3) => {
+            let s = "if ".to_string()
+                + &inner_fmt(t1)
+                + " then "
+                + &inner_fmt(t2)
+                + " else "
+                + &inner_fmt(t3);
+
+            s
+        }
+        Term::TmSucc(t) => {
+            let s = "succ ".to_string() + &inner_fmt(t);
+            s
+        }
+        Term::TmPred(t) => {
+            let s = "pred ".to_string() + &inner_fmt(t);
+            s
+        }
+        Term::TmIsZero(t) => {
+            let s = "iszero ".to_string() + &inner_fmt(t);
+            s
+        }
+        _ => "".to_string(),
+    };
+
+    s
 }
 
 fn parser_true(c: &str) -> IResult<&str, Term> {
@@ -164,64 +183,33 @@ fn is_numericval(t: &Term) -> bool {
     }
 }
 
-fn is_booleanval(t: &Term) -> bool {
+fn eval1(t: &Term) -> Option<Term> {
     match t {
-        Term::TmTrue => true,
-        Term::TmFalse => true,
-        _ => false,
-    }
-}
-
-fn eval1(t: &Term) -> Result<EvalProgress, String> {
-    match t {
-        Term::TmIf(t1, t2, t3) => match **t1 {
-            Term::TmTrue => Ok(EvalProgress::Still(t2.clone())),
-            Term::TmFalse => Ok(EvalProgress::Still(t3.clone())),
-            _ => eval(t).and_then(|t| {
-                Ok(EvalProgress::Still(Box::new(Term::TmIf(
-                    Box::new(t),
-                    t2.clone(),
-                    t3.clone(),
-                ))))
-            }),
+        Term::TmIf(t1, t2, t3) => match &**t1 {
+            Term::TmTrue => Some((**t2).clone()),
+            Term::TmFalse => Some((**t3).clone()),
+            _ => eval1(t1).and_then(|t| Some(Term::TmIf(Box::new(t), t2.clone(), t3.clone()))),
         },
-        Term::TmSucc(t) => {
-            if is_booleanval(t) {
-                Err("数であるべき項が数でない".to_string())
-            } else if is_numericval(t) {
-                Ok(EvalProgress::NoRuleApplies)
-            } else {
-                eval(t).and_then(|t| Ok(EvalProgress::Still(Box::new(Term::TmSucc(Box::new(t))))))
-            }
-        }
+        Term::TmSucc(t) => eval1(t).and_then(|t| Some(Term::TmSucc(Box::new(t)))),
         Term::TmPred(t) => match &**t {
-            // true, falseのエラー処理追加
-            Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmZero))),
-            Term::TmSucc(t) if is_numericval(t) => Ok(EvalProgress::Still(t.clone())),
-            _ => eval(t).and_then(|t| Ok(EvalProgress::Still(Box::new(Term::TmPred(Box::new(t)))))),
+            Term::TmZero => Some(Term::TmZero),
+            Term::TmSucc(t) if is_numericval(t) => Some((**t).clone()),
+            _ => eval1(t).and_then(|t| Some(Term::TmPred(Box::new(t)))),
         },
         Term::TmIsZero(t) => match &**t {
-            Term::TmZero => Ok(EvalProgress::Still(Box::new(Term::TmTrue))),
-            Term::TmSucc(t) if is_numericval(t) => Ok(EvalProgress::Still(Box::new(Term::TmFalse))),
-            _ => eval1(t).and_then(|p| match p {
-                EvalProgress::Still(t) => {
-                    Ok(EvalProgress::Still(Box::new(Term::TmSucc(t.clone()))))
-                }
-                EvalProgress::NoRuleApplies => Ok(EvalProgress::NoRuleApplies),
-            }),
+            Term::TmZero => Some(Term::TmTrue),
+            Term::TmSucc(t) if is_numericval(t) => Some(Term::TmFalse),
+            _ => eval1(t).and_then(|t| Some(Term::TmIsZero(Box::new(t)))),
         },
-        _ => Ok(EvalProgress::NoRuleApplies),
+        _ => None,
     }
 }
 
-fn eval(t: &Term) -> Result<Term, String> {
+fn eval(t: &Term) -> Term {
     let t1 = eval1(t);
     match t1 {
-        Ok(ep) => match ep {
-            EvalProgress::Still(tt) => eval(&*tt),
-            EvalProgress::NoRuleApplies => Ok(t.clone()),
-        },
-        Err(s) => Err(s),
+        Some(t) => eval(&t),
+        None => t.clone(),
     }
 }
 
@@ -231,14 +219,7 @@ fn main() {
         if let Ok(readline) = rl.readline(">> ") {
             if let Some(e) = parse(&readline) {
                 let result = eval(&e);
-                match result {
-                    Ok(t) => {
-                        println!("{}", t);
-                    }
-                    Err(errmsg) => {
-                        println!("{}", errmsg);
-                    }
-                }
+                println!("{}", result);
             }
         } else {
             break;
@@ -340,14 +321,14 @@ mod tests {
     fn eval_zero() {
         let result = eval(&Term::TmZero);
 
-        assert_eq!(Ok(Term::TmZero), result);
+        assert_eq!(Term::TmZero, result);
     }
 
     #[test]
     fn eval_one() {
         let result = eval(&Term::TmSucc(Box::new(Term::TmZero)));
 
-        assert_eq!(Ok(Term::TmSucc(Box::new(Term::TmZero))), result);
+        assert_eq!(Term::TmSucc(Box::new(Term::TmZero)), result);
     }
 
     #[test]
@@ -356,7 +337,7 @@ mod tests {
             Term::TmZero,
         )))));
 
-        assert_eq!(Ok(Term::TmZero), result);
+        assert_eq!(Term::TmZero, result);
     }
 
     #[test]
@@ -393,7 +374,7 @@ mod tests {
 
         let result = eval(&term);
 
-        assert_eq!(result, Ok(Term::TmSucc(Box::new(Term::TmZero))));
+        assert_eq!(result, Term::TmSucc(Box::new(Term::TmZero)));
     }
 
     #[test]
@@ -404,7 +385,7 @@ mod tests {
 
         let result = eval(&term);
 
-        assert_eq!(result, Ok(Term::TmSucc(Box::new(Term::TmZero))));
+        assert_eq!(result, Term::TmSucc(Box::new(Term::TmZero)));
     }
 
     #[test]
@@ -412,7 +393,7 @@ mod tests {
         let term = Term::TmIsZero(Box::new(Term::TmZero));
         let result = eval(&term);
 
-        assert_eq!(result, Ok(Term::TmTrue));
+        assert_eq!(result, Term::TmTrue);
     }
 
     #[test]
@@ -420,7 +401,7 @@ mod tests {
         let term = Term::TmIsZero(Box::new(Term::TmSucc(Box::new(Term::TmZero))));
         let result = eval(&term);
 
-        assert_eq!(result, Ok(Term::TmFalse));
+        assert_eq!(result, Term::TmFalse);
     }
 
     #[test]
@@ -428,6 +409,6 @@ mod tests {
         let term = Term::TmIsZero(Box::new(Term::TmTrue));
         let result = eval(&term);
 
-        assert_eq!(result, Ok(Term::TmIsZero(Box::new(Term::TmTrue))));
+        assert_eq!(result, Term::TmIsZero(Box::new(Term::TmTrue)));
     }
 }
